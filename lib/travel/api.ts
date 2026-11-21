@@ -1,8 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 let client: SupabaseClient | undefined;
-export const demoMode =
-  process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
-  !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Only the explicitly marked preview can use browser-local sample data.
+export const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 export function supabase() {
   if (!client) {
     if (

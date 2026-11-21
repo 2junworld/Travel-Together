@@ -12,6 +12,9 @@ test("database enforces isolation, roles, versions, invitations and atomic appro
     await readFile("supabase/migrations/001_travel.sql", "utf8")
   ).replace("create extension if not exists pgcrypto;", "");
   await db.exec(sql);
+  await db.exec(
+    await readFile("supabase/migrations/002_production_validation.sql", "utf8"),
+  );
   const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -290,5 +293,34 @@ test("database enforces isolation, roles, versions, invitations and atomic appro
       assert.equal(stored.data.deadline, undefined);
     }
   }
+  const missingStatus = createDraft(
+    "itinerary",
+    context,
+    "family",
+    "2026-11-29",
+  );
+  missingStatus.title = "Missing status";
+  delete missingStatus.data.status;
+  await assert.rejects(
+    () =>
+      call("save_item", {
+        tripId: otherTrip,
+        item: missingStatus,
+        expectedVersion: 0,
+      }),
+    /상태/,
+  );
+  const invalidTask = createDraft("tasks", context, "family", "2026-11-29");
+  invalidTask.title = "Missing priority";
+  delete invalidTask.data.priority;
+  await assert.rejects(
+    () =>
+      call("save_item", {
+        tripId: otherTrip,
+        item: invalidTask,
+        expectedVersion: 0,
+      }),
+    /우선순위/,
+  );
   await db.close();
 });

@@ -14,7 +14,7 @@ cp .env.example .env.local
 npm run dev:next
 ```
 
-- Supabase 설정이 없으면 자동으로 샘플 모드가 됩니다.
+- 샘플 모드는 `NEXT_PUBLIC_DEMO_MODE=true`를 명시했을 때만 사용합니다. 운영 설정 누락을 샘플 데이터로 숨기지 않습니다.
 - `npm run build:production` — API가 포함된 Next.js 운영 빌드.
 - `npm run build:preview` — 샘플 전용 정적 HTML/PWA 빌드, `out/` 생성.
 - `npm run typecheck` — TypeScript 검사.
@@ -23,7 +23,7 @@ npm run dev:next
 
 ## 실제 공동 사용 연결
 
-1. 새 Supabase 프로젝트에서 `supabase/migrations/001_travel.sql`을 DB 소유자로 한 번 실행합니다. 기존 프로젝트에는 무작정 적용하지 말고 충돌을 확인해 주세요.
+1. 새 Supabase 프로젝트에서 `supabase/migrations/001_travel.sql`과 `002_production_validation.sql`을 순서대로 DB 소유자로 실행합니다. 기존 프로젝트에는 무작정 적용하지 말고 충돌을 확인해 주세요.
 2. `.env.local` / Vercel 환경변수에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 설정합니다. 공개 publishable key도 해당 변수에 사용할 수 있습니다. **service_role 키는 사용하지 않습니다.** `NEXT_PUBLIC_DEMO_MODE=false`로 둡니다.
 3. Supabase Auth의 사이트 URL을 운영 도메인으로, 리다이렉트 허용 URL에 `https://<운영 도메인>/invite/**`를 등록합니다. 이메일 로그인 링크를 이용합니다. 운영 이메일 발송 설정은 프로젝트에서 확인해 주세요.
 4. Vercel에 Next.js 프로젝트로 배포합니다. Build Command는 `npm run build:production`, Output Directory는 Next.js 기본값입니다. 체험판의 `.openai/hosting.json`은 Sites용이며 Vercel 배포 설정이 아닙니다.
@@ -32,6 +32,8 @@ npm run dev:next
 7. 온라인 Google 지도는 `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` 설정 후 사용합니다. HTTP referrer 및 Maps JavaScript API 제한, 사용량·과금은 Google Cloud에서 설정합니다. 키가 없거나 SDK가 실패해도 목록과 등록된 주소의 길찾기는 유지됩니다.
 
 브라우저 공개 환경변수는 **빌드 시점**에 반영되므로 변경 후 재빌드해야 합니다.
+
+`NEXT_PUBLIC_SITE_URL`도 운영 HTTPS 원점으로 설정합니다. `npm run check:production`이 통과해야 운영 빌드를 진행합니다. 자세한 순서는 [실사용 연결](docs/실사용_연결.md)을 참고하세요.
 
 ## 구현 내용
 

@@ -211,7 +211,20 @@ export default function TravelApp() {
     if (demoMode) return;
     const n = ++epoch.current;
     setVerified(false);
+    let requestedUserId: string | undefined;
     try {
+      const {
+        data: { session: activeSession },
+      } = await supabase().auth.getSession();
+      if (!activeSession)
+        throw Object.assign(Error("다시 로그인해 주세요."), { status: 401 });
+      requestedUserId = activeSession.user.id;
+      if (current.current?.userId !== requestedUserId) {
+        setBundle(null);
+        setSaved("");
+        setSelected(null);
+        setModal(null);
+      }
       const list = await api("list_trips");
       if (n !== epoch.current) return;
       setTrips(list);
@@ -241,7 +254,7 @@ export default function TravelApp() {
       setVerified(true);
       setScreen("travel");
       const prior = await loadSnapshot(data.userId, data.trip.id);
-      if (prior) setSaved(await saveSnapshot(data));
+      setSaved(prior ? await saveSnapshot(data) : "");
     } catch (e: any) {
       if (n !== epoch.current) return;
       setError(e.message);
@@ -251,10 +264,18 @@ export default function TravelApp() {
         setSession(false);
         setScreen("login");
       } else {
-        const snap = await loadSnapshot();
+        const snap = requestedUserId
+          ? await loadSnapshot(
+              requestedUserId,
+              tripId || current.current?.trip.id,
+            )
+          : null;
         if (snap) {
           setBundle(snap.bundle);
           setSaved(snap.savedAt);
+        } else {
+          setBundle(null);
+          setSaved("");
         }
       }
     } finally {
@@ -324,7 +345,13 @@ export default function TravelApp() {
       }
       if (q.get("token")) {
         try {
-          setInviteInfo(await api("invite_info", { token: q.get("token") }));
+          const info = await api("invite_info", { token: q.get("token") });
+          if (info.trip_id) {
+            history.replaceState(null, "", "/travel/");
+            await refresh(info.trip_id);
+            return;
+          }
+          setInviteInfo(info);
           setScreen("invite");
           setLoading(false);
         } catch (e: any) {
@@ -335,6 +362,33 @@ export default function TravelApp() {
       }
       await refresh();
     };
+    let authSubscription: { unsubscribe: () => void } | undefined;
+    if (
+      !demoMode &&
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ) {
+      authSubscription = supabase().auth.onAuthStateChange((event, next) => {
+        const changedAccount =
+          event === "SIGNED_IN" &&
+          next &&
+          current.current &&
+          current.current.userId !== next.user.id;
+        if (event === "SIGNED_OUT" || changedAccount) {
+          epoch.current++;
+          localStorage.setItem("tt-cache-locked", "1");
+          setBundle(null);
+          setVerified(false);
+          setSaved("");
+          setSelected(null);
+          setModal(null);
+          setSession(false);
+          setScreen("login");
+          void clearSnapshots().catch(() => {});
+          if (changedAccount) window.setTimeout(() => location.reload(), 0);
+        }
+      }).data.subscription;
+    }
     void init().catch((e) => {
       setError(e.message || "기기 저장소를 열 수 없습니다.");
       setLoading(false);
@@ -384,6 +438,7 @@ export default function TravelApp() {
     window.addEventListener("focus", focus);
     return () => {
       channel.close();
+      authSubscription?.unsubscribe();
       window.removeEventListener("offline", off);
       window.removeEventListener("online", on);
       window.removeEventListener("focus", focus);
@@ -701,7 +756,12 @@ export default function TravelApp() {
       const { error } = await supabase().auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: location.origin + "/invite/" + location.search,
+          emailRedirectTo: (() => {
+            const url = new URL("/invite/", location.origin);
+            const token = new URLSearchParams(location.search).get("token");
+            if (token) url.searchParams.set("token", token);
+            return url.toString();
+          })(),
         },
       });
       if (error) throw error;
@@ -829,12 +889,20 @@ export default function TravelApp() {
           <button
             key={d}
             aria-label={shortDate(d)}
-            aria-pressed={date===d}
+            aria-pressed={date === d}
             className={date === d ? "active" : ""}
             onClick={() => setDate(d)}
           >
             <span>DAY {i + 1}</span>
-            <strong>{d.slice(5).replace('-', '.')}<small>{new Date(d+'T12:00:00Z').toLocaleDateString('ko-KR',{weekday:'short',timeZone:'UTC'})}</small></strong>
+            <strong>
+              {d.slice(5).replace("-", ".")}
+              <small>
+                {new Date(d + "T12:00:00Z").toLocaleDateString("ko-KR", {
+                  weekday: "short",
+                  timeZone: "UTC",
+                })}
+              </small>
+            </strong>
           </button>
         ))}
     </div>
@@ -1209,7 +1277,6 @@ export default function TravelApp() {
                             <small>개</small>
                             <span>아직 남아 있어요</span>
                           </strong>
-
                         </div>
                         <ChevronRight size={17} />
                       </button>
@@ -1790,7 +1857,10 @@ export default function TravelApp() {
                             }, {}),
                         ).map(([category, items]) => (
                           <section
-                            className={"panel checklist-panel"+(view==="checklist"?" packing-list":"")}
+                            className={
+                              "panel checklist-panel" +
+                              (view === "checklist" ? " packing-list" : "")
+                            }
                             key={category}
                           >
                             <div className="section-title">
@@ -1838,23 +1908,29 @@ export default function TravelApp() {
                                   </strong>
                                   <div className="row-meta">
                                     <ScopeBadge item={x} />
-                                    {(view!=="checklist" || x.data.deadline) && <span>
-                                      {x.data.deadline
-                                        ? shortDate(x.data.deadline)
-                                        : "마감일 미정"}
-                                    </span>}
-                                    {(view!=="checklist" || (x.data.assignees || []).length>0) && <span>
-                                      {(x.data.assignees || []).length
-                                        ? (x.data.assignees || [])
-                                            .map(
-                                              (id: string) =>
-                                                bundle.members.find(
-                                                  (m) => m.user_id === id,
-                                                )?.display_name || "담당자",
-                                            )
-                                            .join(", ")
-                                        : "담당 미정"}
-                                    </span>}
+                                    {(view !== "checklist" ||
+                                      x.data.deadline) && (
+                                      <span>
+                                        {x.data.deadline
+                                          ? shortDate(x.data.deadline)
+                                          : "마감일 미정"}
+                                      </span>
+                                    )}
+                                    {(view !== "checklist" ||
+                                      (x.data.assignees || []).length > 0) && (
+                                      <span>
+                                        {(x.data.assignees || []).length
+                                          ? (x.data.assignees || [])
+                                              .map(
+                                                (id: string) =>
+                                                  bundle.members.find(
+                                                    (m) => m.user_id === id,
+                                                  )?.display_name || "담당자",
+                                              )
+                                              .join(", ")
+                                          : "담당 미정"}
+                                      </span>
+                                    )}
                                     {view === "checklist" &&
                                       (x.data.assignees || []).length > 0 && (
                                         <span>

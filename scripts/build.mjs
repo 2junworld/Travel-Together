@@ -4,7 +4,11 @@ const preview =
   process.env.STATIC_PREVIEW === "1";
 const commands = preview
   ? [["scripts/build-preview.mjs"]]
-  : [["node_modules/next/dist/bin/next", "build"], ["scripts/generate-sw.mjs"]];
+  : [
+      ["scripts/check-production.mjs"],
+      ["node_modules/next/dist/bin/next", "build"],
+      ["scripts/generate-sw.mjs"],
+    ];
 for (const args of commands) {
   const r = spawnSync(process.execPath, args, {
     stdio: "inherit",
