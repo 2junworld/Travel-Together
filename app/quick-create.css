@@ -1,0 +1,109 @@
+/* Scoped to new-item dialogs; edit screens and list styles retain their layout. */
+.quick-create-modal {
+  max-width: 540px;
+}
+.quick-create-modal > header {
+  margin-bottom: 8px;
+}
+.quick-create-modal form > fieldset > label {
+  margin: 12px 0;
+}
+.quick-create-modal form > fieldset > label > input {
+  font-size: 16px;
+  min-height: 48px;
+}
+.quick-create-options {
+  border-top: 1px solid #c7d5df;
+  margin-top: 16px;
+}
+.quick-create-options > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #355970;
+}
+.quick-create-options > summary::-webkit-details-marker {
+  display: none;
+}
+.quick-create-options[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.quick-create-options-body {
+  padding: 0 0 8px;
+}
+.quick-create-options-body > .form-grid:empty {
+  display: none;
+}
+.quick-create-modal .quick-create-scope {
+  margin: 4px 0 0;
+}
+.quick-create-scope > select {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 44px;
+  border: 1px solid #a7c4b7;
+  border-radius: 22px;
+  padding: 8px 35px 8px 14px;
+  background-color: #e4f2ec;
+  color: #155742;
+  font-size: 14px;
+}
+.quick-create-modal .form-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.quick-create-modal .form-footer > .primary {
+  min-height: 48px;
+  flex: 1;
+}
+.quick-create-options > summary:focus-visible {
+  outline: 3px solid #64bcad;
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+@media (max-width: 760px) {
+  .quick-create-modal {
+    padding: 16px 18px;
+    max-height: calc(100dvh - 24px);
+  }
+  .quick-create-modal > header h2 {
+    font-size: 19px;
+  }
+  .quick-create-modal > header {
+    margin-bottom: 0;
+  }
+  .quick-create-modal form > fieldset > label {
+    margin: 10px 0;
+  }
+  .quick-create-modal .quick-create-options {
+    margin-top: 12px;
+  }
+  .quick-create-modal .quick-create-scope {
+    margin: 0;
+  }
+  .quick-create-modal .form-footer {
+    margin-top: 8px;
+    padding: 10px 0 0;
+  }
+}
+.quick-create-modal {
+  max-height: calc(var(--quick-create-viewport, 100dvh) - 24px);
+}
+.quick-create-modal .form-footer {
+  bottom: 0;
+  box-shadow: 0 -6px 12px #ffffff;
+}
+@media (max-width: 760px) {
+  .modal-backdrop:has(> .quick-create-modal) {
+    padding-top: 12px;
+  }
+  .quick-create-modal {
+    max-height: calc(var(--quick-create-viewport, 100dvh) - 24px);
+  }
+}

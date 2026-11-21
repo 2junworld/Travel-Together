@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./contrast.css";
+import "./quick-create.css";
 export const metadata: Metadata = {
   title: "Travel Together · 가족여행",
   description: "함께 준비하고, 여유롭게 떠나는 가족여행",

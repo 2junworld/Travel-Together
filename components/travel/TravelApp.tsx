@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { createDraft } from "@/lib/travel/create";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Anchor,
   ArrowUpRight,
@@ -228,9 +229,13 @@ export default function TravelApp() {
       const data: Bundle = await api("get_data", { tripId: id });
       if (n !== epoch.current) return;
       setBundle(data);
-      if (!new URLSearchParams(location.search).get('date')) {
-        const today=localDate(data.trip.timezone);
-        setDate(today>=data.trip.start_date&&today<=data.trip.end_date?today:data.trip.start_date);
+      if (!new URLSearchParams(location.search).get("date")) {
+        const today = localDate(data.trip.timezone);
+        setDate(
+          today >= data.trip.start_date && today <= data.trip.end_date
+            ? today
+            : data.trip.start_date,
+        );
       }
       setSession(true);
       setVerified(true);
@@ -288,7 +293,14 @@ export default function TravelApp() {
             records?.[0] ||
             seed();
           setBundle(initial);
-          if (!q.get('date')) { const today=localDate(initial.trip.timezone);setDate(today>=initial.trip.start_date&&today<=initial.trip.end_date?today:initial.trip.start_date); }
+          if (!q.get("date")) {
+            const today = localDate(initial.trip.timezone);
+            setDate(
+              today >= initial.trip.start_date && today <= initial.trip.end_date
+                ? today
+                : initial.trip.start_date,
+            );
+          }
           setTrips((records || [initial]).map((x) => x.trip));
           setSession(true);
           setVerified(true);
@@ -323,16 +335,19 @@ export default function TravelApp() {
       }
       await refresh();
     };
-    void init().catch((e)=>{setError(e.message||'기기 저장소를 열 수 없습니다.');setLoading(false)});
+    void init().catch((e) => {
+      setError(e.message || "기기 저장소를 열 수 없습니다.");
+      setLoading(false);
+    });
     const off = async () => {
-      const generation=++epoch.current;
+      const generation = ++epoch.current;
       setOnline(false);
       setVerified(false);
       setModal(null);
       setSelected(null);
       const b = current.current;
       const s = await loadSnapshot(b?.userId, b?.trip.id);
-      if(generation!==epoch.current)return;
+      if (generation !== epoch.current) return;
       setBundle(s?.bundle || null);
       setSaved(s?.savedAt || "");
       if (!s) setError("이 여행은 오프라인에 저장되지 않았습니다.");
@@ -627,33 +642,7 @@ export default function TravelApp() {
     if (!bundle || !user) return;
     setProposal(false);
     setPublication(false);
-    setEdit({
-      id: crypto.randomUUID(),
-      trip_id: bundle.trip.id,
-      kind,
-      title: "",
-      scope: scope === "all" ? "family" : (scope as Scope),
-      family_id:
-        scope === "personal" || scope === "trip" ? null : user.family_id,
-      owner_id: scope === "personal" ? user.user_id : null,
-      version: 1,
-      created_at: new Date().toISOString(),
-      deleted_at: null,
-      data: {
-        ...(kind === "itinerary"
-          ? { date, endDate: date, status: "미정" }
-          : kind === "tasks"
-            ? { status: "예정" }
-            : {}),
-        type: types[kind][0],
-        quantity: 1,
-        listName: "여행 준비물",
-        category: "기본",
-        assignees: [],
-        checked: [],
-        priority: "보통",
-      },
-    });
+    setEdit(createDraft(kind, bundle, scope, date));
     setModal("item");
   }
   function openEdit(item: Item, asProposal = false) {
@@ -2583,17 +2572,31 @@ function Modal({
   title,
   children,
   onClose,
+  compact = false,
 }: {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  compact?: boolean;
 }) {
   const root = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!compact) return;
+    const viewport = window.visualViewport;
+    const sync = () =>
+      root.current?.style.setProperty(
+        "--quick-create-viewport",
+        `${viewport?.height || window.innerHeight}px`,
+      );
+    sync();
+    viewport?.addEventListener("resize", sync);
+    return () => viewport?.removeEventListener("resize", sync);
+  }, [compact]);
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     const el = root.current;
     const first = el?.querySelector<HTMLElement>(
-      "button,input,select,textarea",
+      compact ? "input" : "button,input,select,textarea",
     );
     first?.focus();
     const key = (e: KeyboardEvent) => {
@@ -2636,7 +2639,7 @@ function Modal({
     >
       <section
         ref={root}
-        className="modal"
+        className={"modal" + (compact ? " quick-create-modal" : "")}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -2732,7 +2735,7 @@ function TripSettings({
     </form>
   );
 }
-function ItemForm({
+export function ItemForm({
   item,
   bundle,
   proposal,
@@ -2756,6 +2759,13 @@ function ItemForm({
     setDraft({ ...draft, data: { ...draft.data, [k]: v } });
   const me = bundle.members.find((m) => m.user_id === bundle.userId)!;
   const isNew = !bundle.items.some((x) => x.id === item.id);
+  const quickCreate = isNew && !proposal && !publication;
+  const names = {
+    itinerary: "일정명",
+    places: "장소명",
+    checklist: "준비물명",
+    tasks: "할 일 이름",
+  };
   const candidates = bundle.members.filter(
     (m) =>
       m.active &&
@@ -2781,9 +2791,12 @@ function ItemForm({
           ? "공동 게시할 내용 선택"
           : proposal
             ? "공동 일정 변경 제안"
-            : `${isNew ? "새 항목 추가" : "상세 편집"}`
+            : quickCreate
+              ? `${{ itinerary: "일정", places: "장소", checklist: "준비물", tasks: "할 일" }[draft.kind]} 추가`
+              : `${isNew ? "새 항목 추가" : "상세 편집"}`
       }
       onClose={onClose}
+      compact={quickCreate}
     >
       <form
         onSubmit={async (e) => {
@@ -2849,7 +2862,7 @@ function ItemForm({
             </div>
           )}
           <label>
-            제목
+            {quickCreate ? names[draft.kind] : "제목"}
             <input
               autoFocus
               required
@@ -2858,358 +2871,403 @@ function ItemForm({
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
             />
           </label>
-          <div className="form-grid">
-            {isNew && (
-              <label>
-                공개 범위
-                <select
-                  value={draft.scope}
-                  onChange={(e) => {
-                    const s = e.target.value as Scope;
+          {quickCreate && draft.kind === "itinerary" && (
+            <>
+              <label className="quick-create-date">
+                날짜
+                <input
+                  type="date"
+                  required
+                  value={draft.data.date || ""}
+                  onChange={(e) =>
                     setDraft({
                       ...draft,
-                      scope: s,
-                      family_id: s === "family" ? me.family_id : null,
-                      owner_id: s === "personal" ? me.user_id : null,
                       data: {
                         ...draft.data,
-                        assignees: [],
-                        checked: [],
-                        place_id: null,
+                        date: e.target.value,
+                        endDate:
+                          draft.data.endDate === draft.data.date ||
+                          draft.data.endDate < e.target.value
+                            ? e.target.value
+                            : draft.data.endDate,
                       },
-                    });
-                  }}
-                >
-                  {(["trip", "family", "personal"] as Scope[])
-                    .filter(
-                      (s) =>
-                        s !== "trip" ||
-                        !["itinerary", "places"].includes(draft.kind) ||
-                        me.role === "admin",
-                    )
-                    .map((s) => (
-                      <option key={s} value={s}>
-                        {scopeLabel(s)}
-                      </option>
-                    ))}
-                </select>
-              </label>
-            )}
-            {types[draft.kind].length > 0 && (
-              <label>
-                유형
-                <select
-                  value={draft.data.type}
-                  onChange={(e) => data("type", e.target.value)}
-                >
-                  {types[draft.kind].map((x) => (
-                    <option key={x}>{x}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </div>
-          {draft.kind === "itinerary" && (
-            <>
-              <div className="form-grid">
-                <label>
-                  시작 날짜
-                  <input
-                    type="date"
-                    required
-                    value={draft.data.date || ""}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        data: {
-                          ...draft.data,
-                          date: e.target.value,
-                          endDate:
-                            draft.data.endDate < e.target.value
-                              ? e.target.value
-                              : draft.data.endDate,
-                        },
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  종료 날짜
-                  <input
-                    type="date"
-                    min={draft.data.date}
-                    value={draft.data.endDate || draft.data.date || ""}
-                    onChange={(e) => data("endDate", e.target.value)}
-                  />
-                </label>
-                <label>
-                  시작 시간 · 미정 가능
-                  <input
-                    type="time"
-                    value={draft.data.start || ""}
-                    onChange={(e) => data("start", e.target.value || null)}
-                  />
-                </label>
-                <label>
-                  종료 시간 · 미정 가능
-                  <input
-                    type="time"
-                    value={draft.data.end || ""}
-                    onChange={(e) => data("end", e.target.value || null)}
-                  />
-                </label>
-                <label>
-                  출발지 시간대
-                  <select
-                    value={draft.data.startZone || "Asia/Taipei"}
-                    onChange={(e) => data("startZone", e.target.value)}
-                  >
-                    <option>Asia/Taipei</option>
-                    <option>Asia/Seoul</option>
-                  </select>
-                </label>
-                <label>
-                  도착지 시간대
-                  <select
-                    value={draft.data.endZone || "Asia/Taipei"}
-                    onChange={(e) => data("endZone", e.target.value)}
-                  >
-                    <option>Asia/Taipei</option>
-                    <option>Asia/Seoul</option>
-                  </select>
-                </label>
-                <label>
-                  확정 상태
-                  <select
-                    value={draft.data.status}
-                    onChange={(e) => data("status", e.target.value)}
-                  >
-                    {["확정", "확인 필요", "미정", "취소"].map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  장소
-                  <select
-                    value={draft.data.place_id || ""}
-                    onChange={(e) => data("place_id", e.target.value || null)}
-                  >
-                    <option value="">연결 없음</option>
-                    {places.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <label>참여 가족</label>
-              <div className="assignee-options">
-                {bundle.families.map((f) => (
-                  <label key={f.id}>
-                    <input
-                      type="checkbox"
-                      checked={(draft.data.families || []).includes(f.id)}
-                      onChange={(e) =>
-                        data(
-                          "families",
-                          e.target.checked
-                            ? [...(draft.data.families || []), f.id]
-                            : (draft.data.families || []).filter(
-                                (id: string) => id !== f.id,
-                              ),
-                        )
-                      }
-                    />
-                    {f.name}
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
-          {draft.kind === "places" && (
-            <>
-              <label>
-                주소
-                <input
-                  value={draft.data.address || ""}
-                  onChange={(e) => data("address", e.target.value)}
-                  placeholder="확인된 주소를 입력해 주세요"
+                    })
+                  }
                 />
               </label>
-              <div className="form-grid">
-                <label>
-                  위도
-                  <input
-                    type="number"
-                    min="-90"
-                    max="90"
-                    step="any"
-                    value={draft.data.lat ?? ""}
-                    onChange={(e) =>
-                      data(
-                        "lat",
-                        e.target.value === "" ? null : Number(e.target.value),
-                      )
-                    }
-                  />
-                </label>
-                <label>
-                  경도
-                  <input
-                    type="number"
-                    min="-180"
-                    max="180"
-                    step="any"
-                    value={draft.data.lng ?? ""}
-                    onChange={(e) =>
-                      data(
-                        "lng",
-                        e.target.value === "" ? null : Number(e.target.value),
-                      )
-                    }
-                  />
-                </label>
-              </div>
-              <p className="small-note">
-                직접 확인한 주소·좌표를 등록해 주세요. 지도 없이도 장소 목록을
-                사용할 수 있습니다.
-              </p>
             </>
           )}
-          {draft.kind === "checklist" && (
+          <CreateOptions enabled={quickCreate}>
             <div className="form-grid">
-              <label>
-                목록 이름
-                <input
-                  required
-                  value={draft.data.listName || "여행 준비물"}
-                  onChange={(e) => data("listName", e.target.value)}
-                />
-              </label>
-              <label>
-                카테고리
-                <input
-                  required
-                  value={draft.data.category || "기본"}
-                  onChange={(e) => data("category", e.target.value)}
-                />
-              </label>
-              <label>
-                수량
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={draft.data.quantity}
-                  onChange={(e) => data("quantity", Number(e.target.value))}
-                />
-              </label>
-            </div>
-          )}
-          {["checklist", "tasks"].includes(draft.kind) && (
-            <>
-              <div className="form-grid">
+              {types[draft.kind].length > 0 && (
                 <label>
-                  마감일 · 미정 가능
-                  <input
-                    type="date"
-                    value={draft.data.deadline || ""}
-                    onChange={(e) => data("deadline", e.target.value || null)}
-                  />
+                  유형
+                  <select
+                    value={draft.data.type ?? ""}
+                    onChange={(e) => data("type", e.target.value || null)}
+                  >
+                    {(quickCreate || draft.data.type == null) && (
+                      <option value="">유형 미지정</option>
+                    )}
+                    {types[draft.kind].map((x) => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
                 </label>
-                {draft.kind === "tasks" && (
-                  <>
-                    <label>
-                      마감 시간
+              )}
+            </div>
+            {draft.kind === "itinerary" && (
+              <>
+                <div className="form-grid">
+                  {!quickCreate && (
+                    <>
+                      <label>
+                        시작 날짜
+                        <input
+                          type="date"
+                          required
+                          value={draft.data.date || ""}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              data: {
+                                ...draft.data,
+                                date: e.target.value,
+                                endDate:
+                                  draft.data.endDate < e.target.value
+                                    ? e.target.value
+                                    : draft.data.endDate,
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                    </>
+                  )}
+                  <label>
+                    종료 날짜
+                    <input
+                      type="date"
+                      min={draft.data.date}
+                      value={draft.data.endDate || draft.data.date || ""}
+                      onChange={(e) => data("endDate", e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    시작 시간 · 미정 가능
+                    <input
+                      type="time"
+                      value={draft.data.start || ""}
+                      onChange={(e) => data("start", e.target.value || null)}
+                    />
+                  </label>
+                  <label>
+                    종료 시간 · 미정 가능
+                    <input
+                      type="time"
+                      value={draft.data.end || ""}
+                      onChange={(e) => data("end", e.target.value || null)}
+                    />
+                  </label>
+                  <label>
+                    출발지 시간대
+                    <select
+                      value={draft.data.startZone || "Asia/Taipei"}
+                      onChange={(e) => data("startZone", e.target.value)}
+                    >
+                      <option>Asia/Taipei</option>
+                      <option>Asia/Seoul</option>
+                    </select>
+                  </label>
+                  <label>
+                    도착지 시간대
+                    <select
+                      value={draft.data.endZone || "Asia/Taipei"}
+                      onChange={(e) => data("endZone", e.target.value)}
+                    >
+                      <option>Asia/Taipei</option>
+                      <option>Asia/Seoul</option>
+                    </select>
+                  </label>
+                  <label>
+                    확정 상태
+                    <select
+                      value={draft.data.status}
+                      onChange={(e) => data("status", e.target.value)}
+                    >
+                      {["확정", "확인 필요", "미정", "취소"].map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    장소
+                    <select
+                      value={draft.data.place_id || ""}
+                      onChange={(e) => data("place_id", e.target.value || null)}
+                    >
+                      <option value="">연결 없음</option>
+                      {places.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label>참여 가족</label>
+                <div className="assignee-options">
+                  {bundle.families.map((f) => (
+                    <label key={f.id}>
                       <input
-                        type="time"
-                        value={draft.data.dueTime || ""}
+                        type="checkbox"
+                        checked={(draft.data.families || []).includes(f.id)}
                         onChange={(e) =>
-                          data("dueTime", e.target.value || null)
+                          data(
+                            "families",
+                            e.target.checked
+                              ? [...(draft.data.families || []), f.id]
+                              : (draft.data.families || []).filter(
+                                  (id: string) => id !== f.id,
+                                ),
+                          )
                         }
                       />
+                      {f.name}
                     </label>
-                    <label>
-                      우선순위
-                      <select
-                        value={draft.data.priority}
-                        onChange={(e) => data("priority", e.target.value)}
-                      >
-                        {["높음", "보통", "낮음"].map((s) => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      상태
-                      <select
-                        value={draft.data.status}
-                        onChange={(e) => data("status", e.target.value)}
-                      >
-                        {["예정", "진행", "완료"].map((s) => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                    </label>
-                  </>
-                )}
-              </div>
-              <label>
-                관련 일정
-                <select
-                  value={draft.data.itinerary_id || ""}
-                  onChange={(e) => data("itinerary_id", e.target.value || null)}
-                >
-                  <option value="">연결 없음</option>
-                  {bundle.items
-                    .filter(
-                      (x) =>
-                        x.kind === "itinerary" &&
-                        !x.deleted_at &&
-                        canRead(x, me),
-                    )
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.title}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>담당자 · 여러 명 선택 가능</label>
-              <div className="assignee-options">
-                {candidates.map((m) => (
-                  <label key={m.user_id}>
+                  ))}
+                </div>
+              </>
+            )}
+            {draft.kind === "places" && (
+              <>
+                <label>
+                  주소
+                  <input
+                    value={draft.data.address || ""}
+                    onChange={(e) => data("address", e.target.value)}
+                    placeholder="확인된 주소를 입력해 주세요"
+                  />
+                </label>
+                <div className="form-grid">
+                  <label>
+                    위도
                     <input
-                      type="checkbox"
-                      checked={(draft.data.assignees || []).includes(m.user_id)}
+                      type="number"
+                      min="-90"
+                      max="90"
+                      step="any"
+                      value={draft.data.lat ?? ""}
                       onChange={(e) =>
                         data(
-                          "assignees",
-                          e.target.checked
-                            ? [...(draft.data.assignees || []), m.user_id]
-                            : (draft.data.assignees || []).filter(
-                                (id: string) => id !== m.user_id,
-                              ),
+                          "lat",
+                          e.target.value === "" ? null : Number(e.target.value),
                         )
                       }
                     />
-                    {m.display_name}
                   </label>
-                ))}
+                  <label>
+                    경도
+                    <input
+                      type="number"
+                      min="-180"
+                      max="180"
+                      step="any"
+                      value={draft.data.lng ?? ""}
+                      onChange={(e) =>
+                        data(
+                          "lng",
+                          e.target.value === "" ? null : Number(e.target.value),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+                <p className="small-note">
+                  직접 확인한 주소·좌표를 등록해 주세요. 지도 없이도 장소 목록을
+                  사용할 수 있습니다.
+                </p>
+              </>
+            )}
+            {draft.kind === "checklist" && (
+              <div className="form-grid">
+                <label>
+                  목록 이름
+                  <input
+                    required
+                    value={draft.data.listName || "여행 준비물"}
+                    onChange={(e) => data("listName", e.target.value)}
+                  />
+                </label>
+                <label>
+                  카테고리
+                  <input
+                    required
+                    value={draft.data.category || "기본"}
+                    onChange={(e) => data("category", e.target.value)}
+                  />
+                </label>
+                <label>
+                  수량
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={draft.data.quantity}
+                    onChange={(e) => data("quantity", Number(e.target.value))}
+                  />
+                </label>
               </div>
-            </>
+            )}
+            {["checklist", "tasks"].includes(draft.kind) && (
+              <>
+                <div className="form-grid">
+                  <label>
+                    마감일 · 미정 가능
+                    <input
+                      type="date"
+                      value={draft.data.deadline || ""}
+                      onChange={(e) => data("deadline", e.target.value || null)}
+                    />
+                  </label>
+                  {draft.kind === "tasks" && (
+                    <>
+                      <label>
+                        마감 시간
+                        <input
+                          type="time"
+                          value={draft.data.dueTime || ""}
+                          onChange={(e) =>
+                            data("dueTime", e.target.value || null)
+                          }
+                        />
+                      </label>
+                      <label>
+                        우선순위
+                        <select
+                          value={draft.data.priority}
+                          onChange={(e) => data("priority", e.target.value)}
+                        >
+                          {["높음", "보통", "낮음"].map((s) => (
+                            <option key={s}>{s}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        상태
+                        <select
+                          value={draft.data.status}
+                          onChange={(e) => data("status", e.target.value)}
+                        >
+                          {["예정", "진행", "완료"].map((s) => (
+                            <option key={s}>{s}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                </div>
+                <label>
+                  관련 일정
+                  <select
+                    value={draft.data.itinerary_id || ""}
+                    onChange={(e) =>
+                      data("itinerary_id", e.target.value || null)
+                    }
+                  >
+                    <option value="">연결 없음</option>
+                    {bundle.items
+                      .filter(
+                        (x) =>
+                          x.kind === "itinerary" &&
+                          !x.deleted_at &&
+                          canRead(x, me),
+                      )
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.title}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>담당자 · 여러 명 선택 가능</label>
+                <div className="assignee-options">
+                  {candidates.map((m) => (
+                    <label key={m.user_id}>
+                      <input
+                        type="checkbox"
+                        checked={(draft.data.assignees || []).includes(
+                          m.user_id,
+                        )}
+                        onChange={(e) =>
+                          data(
+                            "assignees",
+                            e.target.checked
+                              ? [...(draft.data.assignees || []), m.user_id]
+                              : (draft.data.assignees || []).filter(
+                                  (id: string) => id !== m.user_id,
+                                ),
+                          )
+                        }
+                      />
+                      {m.display_name}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+            <label>
+              {draft.kind === "tasks" ? "설명" : "공개 메모"}
+              <textarea
+                rows={3}
+                value={draft.data.note || ""}
+                onChange={(e) => data("note", e.target.value)}
+                placeholder="이 항목의 독자에게 함께 보이는 내용입니다. 예약번호는 입력하지 마세요."
+              />
+            </label>
+          </CreateOptions>
+          {isNew && (
+            <label className="quick-create-scope">
+              <span className="sr-only">공개 범위</span>
+              <select
+                value={draft.scope}
+                onChange={(e) => {
+                  const s = e.target.value as Scope;
+                  setDraft({
+                    ...draft,
+                    scope: s,
+                    family_id: s === "family" ? me.family_id : null,
+                    owner_id: s === "personal" ? me.user_id : null,
+                    data: {
+                      ...draft.data,
+                      assignees: [],
+                      checked: [],
+                      place_id: null,
+                    },
+                  });
+                }}
+              >
+                {(["trip", "family", "personal"] as Scope[])
+                  .filter(
+                    (s) =>
+                      s !== "trip" ||
+                      !["itinerary", "places"].includes(draft.kind) ||
+                      me.role === "admin",
+                  )
+                  .map((s) => (
+                    <option key={s} value={s}>
+                      {
+                        {
+                          trip: "여행 멤버 모두에게 공개",
+                          family: "우리 가족에게 공개",
+                          personal: "나만 보기",
+                        }[s]
+                      }
+                    </option>
+                  ))}
+              </select>
+            </label>
           )}
-          <label>
-            {draft.kind === "tasks" ? "설명" : "공개 메모"}
-            <textarea
-              rows={3}
-              value={draft.data.note || ""}
-              onChange={(e) => data("note", e.target.value)}
-              placeholder="이 항목의 독자에게 함께 보이는 내용입니다. 예약번호는 입력하지 마세요."
-            />
-          </label>
           {!isNew && (
             <p className="small-note">
               공개 범위는 상세 화면에서 새 독자를 확인한 후 변경할 수 있습니다.
@@ -3559,7 +3617,14 @@ function Places({
   }, [mapLoaded, JSON.stringify(filtered)]);
   return (
     <>
-      <div className="places-controls"><input aria-label="장소 필터 날짜" type="date" value={date} onChange={e=>onDateChange(e.target.value)} style={{width:165}}/>
+      <div className="places-controls">
+        <input
+          aria-label="장소 필터 날짜"
+          type="date"
+          value={date}
+          onChange={(e) => onDateChange(e.target.value)}
+          style={{ width: 165 }}
+        />
         <select
           aria-label="장소 유형"
           value={type}
@@ -3644,5 +3709,30 @@ function Places({
         </div>
       </div>
     </>
+  );
+}
+
+function CreateOptions({
+  enabled,
+  children,
+}: {
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
+  return enabled ? (
+    <details
+      className="quick-create-options"
+      onInvalidCapture={(e) => {
+        e.currentTarget.open = true;
+      }}
+    >
+      <summary>
+        상세 옵션
+        <ChevronDown size={18} />
+      </summary>
+      <div className="quick-create-options-body">{children}</div>
+    </details>
+  ) : (
+    <>{children}</>
   );
 }

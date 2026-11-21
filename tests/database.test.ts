@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createDraft } from "../lib/travel/create";
 import { PGlite } from "@electric-sql/pglite";
 test("database enforces isolation, roles, versions, invitations and atomic approval", async () => {
   const db = new PGlite();
@@ -264,5 +265,30 @@ test("database enforces isolation, roles, versions, invitations and atomic appro
   });
   await session(B, "b@test.com");
   await assert.rejects(() => call("get_data", { tripId: t }), /旅行|여행/);
+  await session(A, "a@test.com");
+  const context = await call("get_data", { tripId: otherTrip });
+  for (const kind of ["itinerary", "places", "checklist", "tasks"] as const) {
+    const draft = createDraft(kind, context, "family", "2026-11-29");
+    draft.title = kind === "itinerary" ? "호텔 체크인" : kind;
+    await call("save_item", {
+      tripId: otherTrip,
+      item: draft,
+      expectedVersion: 0,
+    });
+    const stored = (await call("get_data", { tripId: otherTrip })).items.find(
+      (x: any) => x.id === draft.id,
+    );
+    assert.equal(stored.data.type, null);
+    assert.deepEqual(stored.data.assignees, []);
+    if (kind === "itinerary") {
+      assert.equal(stored.data.date, "2026-11-29");
+      assert.equal(stored.data.start, undefined);
+    }
+    if (kind === "checklist") assert.equal(stored.data.quantity, 1);
+    if (kind === "tasks") {
+      assert.equal(stored.data.status, "예정");
+      assert.equal(stored.data.deadline, undefined);
+    }
+  }
   await db.close();
 });
