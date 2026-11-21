@@ -8,3 +8,4 @@ out/
 dist/
 api-preview-excluded/
 public/sw.js
+.vercel/
