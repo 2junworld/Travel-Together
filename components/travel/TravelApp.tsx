@@ -1150,10 +1150,10 @@ export default function TravelApp() {
                           A LITTLE PLANNING, A LOT OF MEMORIES
                         </p>
                         <h1>
-                          함께라서 더 좋은 여행
+                          {bundle.trip.title}
                           <span className="heading-dot">.</span>
                         </h1>
-                        <p>준비는 가볍게, 우리 가족의 순간은 오래도록.</p>
+                        <p>일정과 남은 할 일을 먼저 확인해 주세요.</p>
                       </div>
                       <button
                         className="secondary"
@@ -1181,65 +1181,16 @@ export default function TravelApp() {
                         ))}
                       </div>
                     </div>
-                    <section className="trip-hero">
-                      <div className="hero-copy">
-                        <span className="hero-tag">
-                          <Palmtree size={14} />{" "}
-                          {bundle.trip.id === seed().trip.id
-                            ? "TAIWAN · FAMILY TRIP"
-                            : "OUR FAMILY TRIP"}
-                        </span>
-                        <h2>{bundle.trip.title}</h2>
-                        <p>
-                          {bundle.trip.start_date.replaceAll("-", ".")} —{" "}
-                          {bundle.trip.end_date.replaceAll("-", ".")}{" "}
-                          <span>
-                            {dates(bundle.trip.start_date, bundle.trip.end_date)
-                              .length - 1}
-                            박{" "}
-                            {
-                              dates(
-                                bundle.trip.start_date,
-                                bundle.trip.end_date,
-                              ).length
-                            }
-                            일
-                          </span>
-                        </p>
-                        <div className="hero-meta">
-                          <span>
-                            <Users size={15} />
-                            {bundle.families.length}가족
-                          </span>
-                          <span>
-                            <Clock size={15} />
-                            {bundle.trip.timezone}
-                          </span>
-                        </div>
-                      </div>
-                      <Harbor />
-                      <div className="hero-bottom">
-                        <span>
-                          <Baby size={16} />
-                          {bundle.trip.id === seed().trip.id
-                            ? "11월 29일 오후부터 우리 가족만 여행해요"
-                            : "우리 가족의 속도로, 여유롭게 여행해요"}
-                        </span>
-                        <button onClick={() => goto("itinerary")}>
-                          전체 일정 보기 <ChevronRight size={16} />
-                        </button>
-                      </div>
-                    </section>
                     <div className="overview-cards">
                       <button
                         onClick={() => goto("checklist")}
-                        className="stat-card"
+                        className="stat-card stat-checklist"
                       >
                         <div className="stat-icon mint">
                           <ShoppingBag />
                         </div>
                         <div>
-                          <p>차곡차곡, 여행 준비</p>
+                          <p>준비물 완료율</p>
                           <strong>
                             {percent}
                             <small>%</small>
@@ -1255,13 +1206,13 @@ export default function TravelApp() {
                       </button>
                       <button
                         onClick={() => goto("tasks")}
-                        className="stat-card"
+                        className="stat-card stat-tasks"
                       >
                         <div className="stat-icon peach">
                           <Flag />
                         </div>
                         <div>
-                          <p>놓치지 말아야 할 일</p>
+                          <p>남은 할 일</p>
                           <strong>
                             {tasks.filter((x) => !complete(x)).length}
                             <small>개</small>
@@ -1275,15 +1226,15 @@ export default function TravelApp() {
                       </button>
                       <button
                         onClick={() => goto("settings")}
-                        className="stat-card"
+                        className="stat-card stat-offline"
                       >
                         <div className="stat-icon lavender">
                           <Cloud />
                         </div>
                         <div>
-                          <p>인터넷 없이도 든든하게</p>
+                          <p>오프라인 준비</p>
                           <strong className="text-stat">
-                            {saved ? "저장 완료" : "오프라인 저장"}
+                            {saved ? "저장 완료" : "미저장"}
                           </strong>
                           <span className="stat-sub">
                             {saved
@@ -1318,7 +1269,7 @@ export default function TravelApp() {
                           <div>
                             <h2>
                               <CalendarDays size={20} />
-                              하루를 천천히, 오늘의 일정
+                              선택한 날짜의 일정
                             </h2>
                             <p>
                               {date === localDate(bundle.trip.timezone)
@@ -1352,7 +1303,7 @@ export default function TravelApp() {
                           <div className="section-title">
                             <h2>
                               <Flag size={19} />
-                              출발 전, 한 번 더
+                              먼저 확인할 일
                             </h2>
                             <button
                               className="text-link"
@@ -1419,6 +1370,55 @@ export default function TravelApp() {
                         </div>
                       </div>
                     </div>
+                    <section className="trip-hero">
+                      <div className="hero-copy">
+                        <span className="hero-tag">
+                          <Palmtree size={14} />{" "}
+                          {bundle.trip.id === seed().trip.id
+                            ? "TAIWAN · FAMILY TRIP"
+                            : "OUR FAMILY TRIP"}
+                        </span>
+                        <h2>{bundle.trip.title}</h2>
+                        <p>
+                          {bundle.trip.start_date.replaceAll("-", ".")} —{" "}
+                          {bundle.trip.end_date.replaceAll("-", ".")}{" "}
+                          <span>
+                            {dates(bundle.trip.start_date, bundle.trip.end_date)
+                              .length - 1}
+                            박{" "}
+                            {
+                              dates(
+                                bundle.trip.start_date,
+                                bundle.trip.end_date,
+                              ).length
+                            }
+                            일
+                          </span>
+                        </p>
+                        <div className="hero-meta">
+                          <span>
+                            <Users size={15} />
+                            {bundle.families.length}가족
+                          </span>
+                          <span>
+                            <Clock size={15} />
+                            {bundle.trip.timezone}
+                          </span>
+                        </div>
+                      </div>
+                      <Harbor />
+                      <div className="hero-bottom">
+                        <span>
+                          <Baby size={16} />
+                          {bundle.trip.id === seed().trip.id
+                            ? "11월 29일 오후부터 우리 가족만 여행해요"
+                            : "우리 가족의 속도로, 여유롭게 여행해요"}
+                        </span>
+                        <button onClick={() => goto("itinerary")}>
+                          전체 일정 보기 <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </section>
                   </>
                 )}
                 {view !== "home" && (
