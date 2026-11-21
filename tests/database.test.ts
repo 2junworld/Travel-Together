@@ -6,11 +6,11 @@ import { PGlite } from "@electric-sql/pglite";
 test("database enforces isolation, roles, versions, invitations and atomic approval", async () => {
   const db = new PGlite();
   await db.exec(
-    `create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);create function auth.uid()returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;create function auth.jwt()returns jsonb language sql stable as $$select jsonb_build_object('email',current_setting('request.jwt.claim.email',true))$$;create function public.digest(text,text)returns bytea language sql immutable as $$select decode(md5($1),'hex')$$;create function public.gen_random_bytes(integer)returns bytea language sql volatile as $$select decode(replace(gen_random_uuid()::text,'-',''),'hex')$$;`,
+    `create role anon;create role authenticated;create schema auth;create schema extensions;create table auth.users(id uuid primary key);create function auth.uid()returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;create function auth.jwt()returns jsonb language sql stable as $$select jsonb_build_object('email',current_setting('request.jwt.claim.email',true))$$;create function extensions.digest(text,text)returns bytea language sql immutable as $$select decode(md5($1),'hex')$$;create function extensions.gen_random_bytes(integer)returns bytea language sql volatile as $$select decode(replace(gen_random_uuid()::text,'-',''),'hex')$$;`,
   );
   const sql = (
     await readFile("supabase/migrations/001_travel.sql", "utf8")
-  ).replace("create extension if not exists pgcrypto;", "");
+  ).replace("create extension if not exists pgcrypto with schema extensions;", "");
   await db.exec(sql);
   await db.exec(
     await readFile("supabase/migrations/002_production_validation.sql", "utf8"),

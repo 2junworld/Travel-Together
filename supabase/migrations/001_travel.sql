@@ -1,5 +1,6 @@
 -- Travel Together. Run once in a new Supabase project as database owner.
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 create schema if not exists travel_private;
 revoke all on schema travel_private from public;
 create table public.trips(id uuid primary key default gen_random_uuid(),title text not null check(length(title) between 1 and 100),start_date date not null,end_date date not null,timezone text not null default 'Asia/Taipei',created_by uuid not null references auth.users,archived_at timestamptz,version integer not null default 1,created_at timestamptz not null default now(),check(start_date<=end_date),check(end_date-start_date<=365));
@@ -53,7 +54,7 @@ begin
  return jsonb_build_object('trip_id',tid);
  end if;
  if action in('invite_info','accept_invite')then
- select * into inv from travel_private.invites where token_hash=encode(digest(payload->>'token','sha256'),'hex') for update;
+ select * into inv from travel_private.invites where token_hash=encode(extensions.digest(payload->>'token','sha256'),'hex') for update;
  if not found or lower(inv.email)<>lower(auth.jwt()->>'email')then raise sqlstate 'PT404' using message='초대를 찾을 수 없습니다.';end if;
  if inv.used_at is not null then if inv.accepted_by=uid then return jsonb_build_object('trip_id',inv.trip_id);else raise sqlstate 'PT404' using message='초대를 찾을 수 없습니다.';end if;end if;
  if inv.expires_at<now()then raise sqlstate 'PT422' using message='초대가 만료되었습니다.';end if;
@@ -98,7 +99,7 @@ begin
  if role_name<>'admin'then raise sqlstate 'PT403' using message='관리자 권한이 필요합니다.';end if;
  new_email:=lower(trim(payload->>'email'));fid:=(payload->>'familyId')::uuid;
  if new_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'or not exists(select 1 from trip_families where trip_id=tid and id=fid)then raise sqlstate 'PT422' using message='이메일과 가족을 확인해 주세요.';end if;
- token:=encode(gen_random_bytes(32),'hex');insert into travel_private.invites(trip_id,family_id,email,token_hash)values(tid,fid,new_email,encode(digest(token,'sha256'),'hex'));return jsonb_build_object('token',token);
+ token:=encode(extensions.gen_random_bytes(32),'hex');insert into travel_private.invites(trip_id,family_id,email,token_hash)values(tid,fid,new_email,encode(extensions.digest(token,'sha256'),'hex'));return jsonb_build_object('token',token);
  end if;
  if action='members'then
  if role_name<>'admin'then raise sqlstate 'PT403' using message='관리자 권한이 필요합니다.';end if;
@@ -262,3 +263,6 @@ begin
 end$$;
 revoke all on function public.travel_command(text,jsonb) from public,anon;
 grant execute on function public.travel_command(text,jsonb) to authenticated;
+
+alter table travel_private.invites enable row level security;
+revoke all on travel_private.invites from anon,authenticated;
