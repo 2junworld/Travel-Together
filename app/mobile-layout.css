@@ -1,0 +1,147 @@
+/* Phone layout corrections grounded in the supplied full-screen capture. */
+@media (max-width: 760px) {
+  .demo-banner, .page-heading p, .section-description, .family-note p, .hero-bottom {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+  }
+  .overview-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: stretch;
+  }
+  .overview-cards > .stat-card {
+    display: block;
+    padding: 14px;
+    min-height: 122px;
+    text-align: left;
+  }
+  .overview-cards > .stat-card > div:not(.stat-icon) { min-width: 0; }
+  .overview-cards .stat-card p {
+    min-height: 0;
+    margin: 0 0 10px;
+    font-size: 14px;
+    line-height: 20px;
+    white-space: nowrap;
+  }
+  .overview-cards .stat-card strong {
+    font-size: 32px;
+    line-height: 38px;
+    letter-spacing: -.04em;
+  }
+  .overview-cards .stat-card strong small {
+    font-size: 16px;
+    margin-left: 5px;
+  }
+  .overview-cards .stat-card strong > span {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 20px;
+    letter-spacing: normal;
+    white-space: normal;
+    word-break: keep-all;
+  }
+  .overview-cards .stat-card .progress { margin-top: 8px; height: 5px; }
+  .overview-cards > .stat-offline:last-child {
+    grid-column: 1 / -1;
+    min-height: 0;
+    padding: 11px 14px;
+  }
+  .stat-offline > div:not(.stat-icon) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 3px;
+    align-items: baseline;
+  }
+  .overview-cards .stat-offline p { margin: 0; }
+  .overview-cards .stat-offline strong.text-stat {
+    margin: 0;
+    font-size: 17px;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+  .stat-offline .stat-sub {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 13px;
+    line-height: 20px;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .section-title { align-items: flex-start; }
+  .section-title > div { min-width: 0; }
+  .section-title h2 {
+    font-size: 16px;
+    line-height: 24px;
+    word-break: keep-all;
+  }
+  .section-title h2 svg { flex-shrink: 0; }
+  .section-title > .text-link { flex-shrink: 0; margin-top: -4px; }
+  .date-tabs {
+    gap: 4px;
+    padding-top: 14px;
+    padding-bottom: 16px;
+    scroll-padding-inline: 2px;
+  }
+  .date-tabs button {
+    flex: 1 0 56px;
+    min-width: 56px;
+    min-height: 62px;
+    padding: 9px 2px;
+  }
+  .date-tabs button > span { font-size: 10px; letter-spacing: .6px; }
+  .date-tabs strong {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 3px;
+    font-size: 13px;
+    line-height: 20px;
+    white-space: nowrap;
+    letter-spacing: -.02em;
+  }
+  .date-tabs strong small { font-size: 11px; font-weight: 500; }
+  .timeline-row { grid-template-columns: 45px 22px minmax(0, 1fr); gap: 6px; }
+  .timeline-row:not(:last-child):before { left: 62px; }
+  .timeline-icon { width: 24px; height: 26px; }
+  .timeline-time strong { font-size: 16px; white-space: nowrap; }
+  .timeline-time span { line-height: 18px; }
+  .item-top { gap: 5px; }
+  .item-top .eyebrow { flex-shrink: 0; }
+  .itinerary-card h3 { word-break: keep-all; overflow-wrap: break-word; line-height: 1.6; }
+  .item-bottom { gap: 6px; }
+  .item-bottom > span:not(.scope-badge) { white-space: nowrap; }
+  .mini-tasks > button > div { min-width: 0; flex: 1; }
+  .mini-tasks strong { word-break: keep-all; overflow-wrap: break-word; }
+  .trip-hero { padding: 0; min-height: 0; }
+  .trip-hero .hero-copy { padding: 18px; }
+  .hero-copy > p { line-height: 24px; }
+  .hero-copy > p > span { display: inline-block; white-space: nowrap; }
+  .hero-bottom {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    padding: 8px 14px;
+    min-height: 52px;
+  }
+  .hero-bottom > span {
+    flex: 1 1 160px;
+    max-width: none;
+    font-size: 12px;
+    line-height: 20px;
+  }
+  .hero-bottom > span > svg { flex-shrink: 0; }
+  .hero-bottom > button { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
+  .family-note { gap: 10px; padding: 18px 14px; }
+  .family-note > div { min-width: 0; }
+  .family-note h3 { word-break: keep-all; }
+  .footer { flex-wrap: wrap; gap: 5px; line-height: 20px; }
+  .footer > span { white-space: nowrap; }
+}
+/* Keep the shorter date labels aligned on desktop as well. */
+@media (min-width: 761px) {
+ .date-tabs strong { display:flex; gap:5px; justify-content:center; align-items:baseline; }
+ .date-tabs strong small { font-size:12px; font-weight:500; }
+}

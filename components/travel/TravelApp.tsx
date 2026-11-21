@@ -828,11 +828,13 @@ export default function TravelApp() {
         dates(bundle.trip.start_date, bundle.trip.end_date).map((d, i) => (
           <button
             key={d}
+            aria-label={shortDate(d)}
+            aria-pressed={date===d}
             className={date === d ? "active" : ""}
             onClick={() => setDate(d)}
           >
             <span>DAY {i + 1}</span>
-            <strong>{shortDate(d)}</strong>
+            <strong>{d.slice(5).replace('-', '.')}<small>{new Date(d+'T12:00:00Z').toLocaleDateString('ko-KR',{weekday:'short',timeZone:'UTC'})}</small></strong>
           </button>
         ))}
     </div>
@@ -881,7 +883,7 @@ export default function TravelApp() {
               ? item.data.startZone === "Asia/Seoul"
                 ? "한국 시각"
                 : "대만 시각"
-              : "시간 미정"}
+              : null}
           </span>
         </div>
         <div
@@ -1207,9 +1209,7 @@ export default function TravelApp() {
                             <small>개</small>
                             <span>아직 남아 있어요</span>
                           </strong>
-                          <span className="stat-sub">
-                            함께 확인하고 준비해요
-                          </span>
+
                         </div>
                         <ChevronRight size={17} />
                       </button>
@@ -1228,7 +1228,7 @@ export default function TravelApp() {
                           <span className="stat-sub">
                             {saved
                               ? timeText(saved) + " 기준"
-                              : "출발 전 여행을 저장해 주세요"}
+                              : "출발 전 저장해 주세요"}
                           </span>
                         </div>
                         <ChevronRight size={17} />
@@ -1400,7 +1400,7 @@ export default function TravelApp() {
                         <span>
                           <Baby size={16} />
                           {bundle.trip.id === seed().trip.id
-                            ? "11월 29일 오후부터 우리 가족만 여행해요"
+                            ? "11/29 오후부터 우리 가족 일정"
                             : "우리 가족의 속도로, 여유롭게 여행해요"}
                         </span>
                         <button onClick={() => goto("itinerary")}>
