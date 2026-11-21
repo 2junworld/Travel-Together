@@ -1790,7 +1790,7 @@ export default function TravelApp() {
                             }, {}),
                         ).map(([category, items]) => (
                           <section
-                            className="panel checklist-panel"
+                            className={"panel checklist-panel"+(view==="checklist"?" packing-list":"")}
                             key={category}
                           >
                             <div className="section-title">
@@ -1838,12 +1838,12 @@ export default function TravelApp() {
                                   </strong>
                                   <div className="row-meta">
                                     <ScopeBadge item={x} />
-                                    <span>
+                                    {(view!=="checklist" || x.data.deadline) && <span>
                                       {x.data.deadline
                                         ? shortDate(x.data.deadline)
                                         : "마감일 미정"}
-                                    </span>
-                                    <span>
+                                    </span>}
+                                    {(view!=="checklist" || (x.data.assignees || []).length>0) && <span>
                                       {(x.data.assignees || []).length
                                         ? (x.data.assignees || [])
                                             .map(
@@ -1854,7 +1854,7 @@ export default function TravelApp() {
                                             )
                                             .join(", ")
                                         : "담당 미정"}
-                                    </span>
+                                    </span>}
                                     {view === "checklist" &&
                                       (x.data.assignees || []).length > 0 && (
                                         <span>
