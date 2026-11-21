@@ -1,6 +1,7 @@
 "use client";
 import { createDraft } from "@/lib/travel/create";
 import React, { useEffect, useRef, useState } from "react";
+import { lockBodyScroll } from "@/lib/travel/scroll-lock";
 import {
   Anchor,
   ArrowUpRight,
@@ -2644,7 +2645,7 @@ function Empty({ text, sub }: { text: string; sub: string }) {
     </div>
   );
 }
-function Modal({
+export function Modal({
   title,
   children,
   onClose,
@@ -2698,11 +2699,10 @@ function Modal({
       }
     };
     document.addEventListener("keydown", key);
-    const old = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlockScroll = lockBodyScroll(document.body);
     return () => {
       document.removeEventListener("keydown", key);
-      document.body.style.overflow = old;
+      unlockScroll();
       prev?.focus();
     };
   }, []);
