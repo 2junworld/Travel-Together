@@ -1,0 +1,32 @@
+{
+  "name": "travel-together",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "",
+    "build": "node scripts/build.mjs",
+    "build:preview": "node scripts/build-preview.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "dev:next": "next dev --hostname 0.0.0.0",
+    "build:production": "next build && node scripts/generate-sw.mjs"
+  },
+  "dependencies": {
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@supabase/supabase-js": "^2.57.0",
+    "idb": "^8.0.3",
+    "lucide-react": "^0.468.0",
+    "tailwindcss": "^4.1.0",
+    "@tailwindcss/postcss": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tsx": "^4.20.0",
+    "@electric-sql/pglite": "^0.3.14"
+  }
+}

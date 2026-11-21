@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+
+dist/
+api-preview-excluded/
+public/sw.js
