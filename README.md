@@ -4,7 +4,7 @@
 
 운영 앱: https://travel-together-theta.vercel.app
 
-개발 이력 관리 대상: https://github.com/2junworld/Travel-Together (`main`). 2026-11-22 기준 GitHub 최초 업로드는 연결의 쓰기 권한 오류로 대기 중입니다. 업로드 완료 후 해당 저장소를 기준으로 개발합니다.
+개발 이력 관리 대상: https://github.com/2junworld/Travel-Together (`main`). 이 저장소를 기준으로 개발하며, 코드·테스트·DB 마이그레이션·문서 변경을 커밋으로 남깁니다.
 
 운영 버전은 Supabase와 연결되어 있으며 이메일 링크 로그인은 사용자가 확인했습니다. 별도 Sites 정적 미리보기는 **샘플 체험판**으로, 편집 내용이 브라우저에만 저장됩니다.
 
