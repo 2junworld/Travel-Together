@@ -529,8 +529,7 @@ export default function TravelApp() {
         x.data.status !== "취소" &&
         x.data.place_id &&
         user &&
-        canRead(x, user) &&
-        true,
+        canRead(x, user),
     )
     .filter(
       (x) =>
