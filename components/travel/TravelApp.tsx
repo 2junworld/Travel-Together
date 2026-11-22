@@ -520,39 +520,42 @@ export default function TravelApp() {
     tasks = visible("tasks"),
     done = checks.filter(complete).length,
     percent = checks.length ? Math.round((done / checks.length) * 100) : 0;
+  // Home always follows the current family's readable schedule, regardless of tab filters.
   const nextPlaceItem = bundle?.items
     .filter(
       (x) =>
         x.kind === "itinerary" &&
         !x.deleted_at &&
         x.data.status !== "취소" &&
-        x.data.start &&
         x.data.place_id &&
         user &&
         canRead(x, user) &&
-        (scope === "all" || x.scope === scope),
+        true,
     )
     .filter(
       (x) =>
         zonedInstant(
           x.data.date,
-          x.data.start,
+          x.data.start || "23:59",
           x.data.startZone || bundle.trip.timezone,
-        ) >= Date.now(),
+        ) >= (localDate(bundle.trip.timezone) < bundle.trip.start_date ? zonedInstant(bundle.trip.start_date, "00:00", bundle.trip.timezone) : Date.now()),
     )
     .sort(
       (a, b) =>
         zonedInstant(
           a.data.date,
-          a.data.start,
+          a.data.start || "23:59",
           a.data.startZone || bundle!.trip.timezone,
         ) -
         zonedInstant(
           b.data.date,
-          b.data.start,
+          b.data.start || "23:59",
           b.data.startZone || bundle!.trip.timezone,
         ),
     )[0];
+  const stays = itinerary.filter((x) => x.data.type === "숙박");
+  // On a hotel changeover day, the new check-in takes precedence.
+  const currentStay = stays.sort((a, b) => b.data.date.localeCompare(a.data.date))[0];
   const nextPlace = bundle?.items.find(
     (x) =>
       x.id === nextPlaceItem?.data.place_id &&
@@ -1282,7 +1285,8 @@ export default function TravelApp() {
                         <ChevronRight size={17} />
                       </button>
                       <button
-                        onClick={() => goto("settings")}
+                        onClick={() => void offlineSave()}
+                        disabled={busy || !verified || !online}
                         className="stat-card stat-offline"
                       >
                         <div className="stat-icon lavender">
@@ -1291,7 +1295,7 @@ export default function TravelApp() {
                         <div>
                           <p>오프라인 준비</p>
                           <strong className="text-stat">
-                            {saved ? "저장 완료" : "미저장"}
+                            {busy ? "저장 중…" : saved ? "저장 완료 · 다시 저장" : "지금 저장"}
                           </strong>
                           <span className="stat-sub">
                             {saved
@@ -1315,7 +1319,7 @@ export default function TravelApp() {
                           <strong>{nextPlace.title}</strong>
                         </span>
                         <span>
-                          {nextPlaceItem?.data.date} {nextPlaceItem?.data.start}
+                          {nextPlaceItem?.data.date} {nextPlaceItem?.data.start || "시간 미정"}
                         </span>
                         <ChevronRight size={18} />
                       </button>
@@ -1413,9 +1417,7 @@ export default function TravelApp() {
                             <p className="eyebrow">LITTLE TRAVELERS</p>
                             <h3>작은 여행자의 큰 하루</h3>
                             <p>
-                              낮잠과 식사 사이, 여유를 남겨 주세요.
-                              <br />
-                              즐거운 여행은 아기 컨디션부터.
+                              낮잠과 식사 사이, 여유를 남겨 주세요. 즐거운 여행은 아기 컨디션부터.
                             </p>
                           </div>
                         </section>
@@ -1585,8 +1587,15 @@ export default function TravelApp() {
                                 {itinerary.length}개의 일정
                               </span>
                             </div>
+                            {currentStay && (
+                              <button className="itinerary-card" onClick={() => setSelected(currentStay)}>
+                                <strong>오늘의 숙소 · {currentStay.data.date === date ? "체크인" : currentStay.data.endDate === date ? "체크아웃" : "숙박"}</strong>
+                                <span> {bundle.items.find((p) => p.id === currentStay.data.place_id)?.title || currentStay.title}</span>
+                              </button>
+                            )}
                             <div className="timeline">
                               {itinerary
+                                .filter((x) => x.data.type !== "숙박")
                                 .filter((x) => x.title.includes(search))
                                 .map((x) => (
                                   <ItineraryCard key={x.id} item={x} />
@@ -1851,7 +1860,7 @@ export default function TravelApp() {
                             .reduce((acc: Record<string, Item[]>, x) => {
                               const key =
                                 view === "checklist"
-                                  ? `${x.data.listName || "여행 준비물"} · ${x.data.category || "기본"}`
+                                  ? x.data.category || "기본"
                                   : "할 일 목록";
                               (acc[key] ??= []).push(x);
                               return acc;
@@ -3734,7 +3743,7 @@ function Places({
               <p>
                 {mapError ||
                   (!key
-                    ? "Google 지도 연결 전입니다. 확인된 주소를 등록하면 길찾기를 사용할 수 있어요."
+                    ? "지도 미리보기 대신 각 장소의 길찾기 버튼으로 Google 지도를 바로 열 수 있어요."
                     : "온라인 연결 후 지도를 이용할 수 있습니다.")}
               </p>
               <div className="map-place-tags">
