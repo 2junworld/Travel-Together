@@ -4,7 +4,7 @@
 
 운영 앱: https://travel-together-theta.vercel.app
 
-개발 이력 관리 대상: https://github.com/2junworld/Travel-Together (`main`). 앞으로 이 저장소를 기준으로 개발합니다. 최초 업로드는 GitHub 연결의 쓰기 권한 오류와 브라우저 파일 전송 장애로 아직 완료되지 않았습니다. 전체 소스와 기존 커밋은 Git bundle로 준비했습니다.
+개발과 커밋 이력은 [Travel Together GitHub 저장소](https://github.com/2junworld/Travel-Together)의 `main` 브랜치를 기준으로 관리합니다. 작업 전 원격 브랜치와 기존 변경 사항을 확인하고, 소스·테스트·마이그레이션·문서 변경을 Git 커밋으로 기록합니다.
 
 운영 버전은 Supabase와 연결되어 있으며 이메일 링크 로그인은 사용자가 확인했습니다. 별도 Sites 정적 미리보기는 **샘플 체험판**으로, 편집 내용이 브라우저에만 저장됩니다.
 
