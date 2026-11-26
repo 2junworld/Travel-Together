@@ -1,4 +1,5 @@
 "use client";
+import { applyWrite, reconcileItems, type ItemWrite } from "@/lib/travel/optimistic";
 import { createDraft } from "@/lib/travel/create";
 import React, { useEffect, useRef, useState } from "react";
 import { lockBodyScroll } from "@/lib/travel/scroll-lock";
@@ -168,7 +169,7 @@ function Harbor() {
   );
 }
 export default function TravelApp() {
-  const [bundle, setBundle] = useState<Bundle | null>(null),
+  const [base, setBundle] = useState<Bundle | null>(null),
     [view, setView] = useState("home"),
     [date, setDate] = useState("2026-11-27"),
     [scope, setScope] = useState("all"),
@@ -199,6 +200,21 @@ export default function TravelApp() {
     [session, setSession] = useState(false),
     [inviteInfo, setInviteInfo] = useState<any>(null),
     [inviteUrl, setInviteUrl] = useState("");
+  const [pending, setPending] = useState<ItemWrite[]>([]);
+  const [failed, setFailed] = useState<{op: ItemWrite; reason: string}[]>([]);
+  const tail = useRef(Promise.resolve());
+  const invalidatedWrites = useRef(new Set<ItemWrite>());
+  const queued = useRef(new Set<ItemWrite>());
+  const activeWrites = useRef(new Set<string>());
+  const channel = useRef<ReturnType<ReturnType<typeof supabase>["channel"]> | null>(null);
+  const bundle = React.useMemo(() => {
+    if (!base) return null;
+    const items = pending.reduce((rows, op) => op.userId === base.userId && op.item.trip_id === base.trip.id
+      ? applyWrite(rows, op) : rows, base.items);
+    return items === base.items ? base : { ...base, items };
+  }, [base, pending]);
+  const confirmed = useRef(base);
+  confirmed.current = base;
   const current = useRef<Bundle | null>(null),
     epoch = useRef(0);
   current.current = bundle;
@@ -240,9 +256,11 @@ export default function TravelApp() {
         setVerified(true);
         return;
       }
+      const atStart = confirmed.current;
       const data: Bundle = await api("get_data", { tripId: id });
       if (n !== epoch.current) return;
-      setBundle(data);
+      setBundle(b => b && atStart && b.userId === data.userId && b.trip.id === id && atStart.trip.id === id
+        ? { ...data, items: reconcileItems(data.items, b.items, atStart.items) } : data);
       if (!new URLSearchParams(location.search).get("date")) {
         const today = localDate(data.trip.timezone);
         setDate(
@@ -255,7 +273,7 @@ export default function TravelApp() {
       setVerified(true);
       setScreen("travel");
       const prior = await loadSnapshot(data.userId, data.trip.id);
-      setSaved(prior ? await saveSnapshot(data) : "");
+      if (n === epoch.current) setSaved(prior?.savedAt || "");
     } catch (e: any) {
       if (n !== epoch.current) return;
       setError(e.message);
@@ -566,6 +584,104 @@ export default function TravelApp() {
     dueSoon(x, bundle?.trip.timezone || "Asia/Taipei"),
   );
   const title = tabs.find((x) => x[0] === view)?.[1] || "여행 홈";
+  useEffect(() => {
+    if (!pending.length && !failed.length) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pending.length, failed.length]);
+
+  const hasSnapshot = Boolean(saved);
+  useEffect(() => {
+    if (!base || demoMode || !verified || !hasSnapshot) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      void saveSnapshot(base).then(time => { if (live) setSaved(time); })
+        .catch(() => { if (live) setError("오프라인 저장본을 갱신하지 못했습니다."); });
+    }, 200);
+    return () => { live = false; clearTimeout(timer); };
+  }, [base, verified, hasSnapshot]);
+  // Only an invalidation travels over the channel. RLS determines the rows each reader receives.
+  useEffect(() => {
+    if (demoMode || !base || !verified || !online) return;
+    const { userId, trip } = base;
+    let live = true, generation = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const sync = async () => {
+      const n = ++generation;
+      const start = confirmed.current;
+      if (!start) return;
+      const rows: Item[] = [];
+      const pageSize = 500;
+      for (let offset = 0; live && n === generation; offset += pageSize) {
+        const { data, error } = await supabase().from("travel_items")
+          .select("id,trip_id,kind,title,scope,family_id,owner_id,version,created_at,deleted_at,data")
+          .eq("trip_id", trip.id).order("id").range(offset, offset + pageSize - 1);
+        if (error || !data) return;
+        rows.push(...data as Item[]);
+        if (data.length < pageSize) break;
+      }
+      if (!live || n !== generation) return;
+      setBundle(b => b?.userId === userId && b.trip.id === trip.id
+        ? { ...b, items: reconcileItems(rows, b.items, start.items) } : b);
+    };
+    const ch = supabase().channel("travel-items-" + trip.id)
+      .on("broadcast", { event: "changed" }, () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => void sync(), 120);
+      }).subscribe();
+    channel.current = ch;
+    return () => { live = false; clearTimeout(timer); channel.current = null; void supabase().removeChannel(ch); };
+  }, [base?.userId, base?.trip.id, online, verified]);
+
+  function queueWrite(op: ItemWrite) {
+    if (!writable || !navigator.onLine) throw Error("온라인 연결과 편집 권한을 확인해 주세요.");
+    const key = [op.userId, op.item.trip_id, op.item.id, op.expectedVersion].join("/");
+    if (activeWrites.current.has(key)) return;
+    activeWrites.current.add(key);
+    queued.current.add(op);
+    setPending(rows => [...rows, op]);
+    tail.current = tail.current.then(async () => {
+      const same = (b: Bundle | null) => b?.userId === op.userId && b.trip.id === op.item.trip_id;
+      try {
+        if (invalidatedWrites.current.has(op))
+          throw Error("앞선 변경을 저장하지 못했습니다. 입력 내용을 확인해 주세요.");
+        const payload = { tripId: op.item.trip_id, expectedVersion: op.expectedVersion,
+          ...(op.action === "save_item" ? { item: op.item } : { itemId: op.item.id, checked: op.checked }) };
+        const result = await api(op.action, payload, op.userId);
+        setBundle(b => {
+          if (!b || !same(b)) return b;
+          let items = applyWrite(b.items, op);
+          const row: Item | undefined = result?.row;
+          if (row) items = items.map(x => x.id === row.id && x.version <= row.version ? row : x);
+          return { ...b, items };
+        });
+        if (same(current.current)) void channel.current?.send({ type: "broadcast", event: "changed", payload: {} }).catch(() => {});
+      } catch (err) {
+        for (const later of queued.current) {
+          if (later !== op && later.item.id === op.item.id && later.userId === op.userId)
+            invalidatedWrites.current.add(later);
+        }
+        setFailed(rows => [...rows, {op, reason: err instanceof Error ? err.message : "연결 오류"}]);
+        if (same(current.current) && navigator.onLine) {
+          const { data, error } = await supabase().from("travel_items").select("*")
+            .eq("trip_id", op.item.trip_id).eq("id", op.item.id).maybeSingle();
+          if (!error) setBundle(b => {
+            if (!b || !same(b)) return b;
+            const items = b.items.filter(x => x.id !== op.item.id);
+            const old = b.items.find(x => x.id === op.item.id);
+            if (data) items.push(old && old.version > data.version ? old : data as Item);
+            return { ...b, items };
+          });
+        }
+      } finally {
+        queued.current.delete(op);
+        invalidatedWrites.current.delete(op);
+        activeWrites.current.delete(key);
+        setPending(rows => rows.filter(x => x !== op));
+      }
+    }).catch(() => {});
+  }
   async function saveItem(item: Item, forceEdit = false) {
     validate(item);
     if (!bundle || !user) return;
@@ -619,6 +735,9 @@ export default function TravelApp() {
         },
       );
       notify("변경 제안을 제출했습니다.");
+    } else if (!demoMode) {
+      queueWrite({ action: "save_item", item, expectedVersion: exists ? item.version : 0,
+        userId: bundle.userId, at: new Date().toISOString() });
     } else {
       await command(
         "save_item",
@@ -640,6 +759,11 @@ export default function TravelApp() {
   }
   async function remove(item: Item, restore = false) {
     if (!bundle) return;
+    if (!demoMode) {
+      queueWrite({action: restore ? "restore_item" : "delete_item", item, expectedVersion: item.version, userId: bundle.userId, at: new Date().toISOString()});
+      setSelected(null);
+      return;
+    }
     await command(
       restore ? "restore_item" : "delete_item",
       {
@@ -676,6 +800,10 @@ export default function TravelApp() {
     const checked = a.length
       ? !(item.data.checked || []).includes(user.user_id)
       : !complete(item);
+    if (!demoMode) {
+      queueWrite({action: "check_item", item, expectedVersion: item.version, userId: bundle.userId, checked, at: new Date().toISOString()});
+      return;
+    }
     await command(
       "check_item",
       {
@@ -1140,6 +1268,17 @@ export default function TravelApp() {
             </button>
           </div>
         )}
+        {failed.filter(({op}) => op.userId === bundle?.userId && op.item.trip_id === bundle.trip.id).map(f => (
+          <div className="error-banner" role="alert" key={f.op.item.id + f.op.at}>
+            <span>{f.op.item.title} 저장 확인 실패 · {f.reason}</span>
+            <button disabled={!writable} onClick={() => {
+              const old = bundle!.items.find(x => x.id === f.op.item.id);
+              if (f.op.action === "save_item") openEdit({ ...f.op.item, version: old?.version ?? 1 });
+              else if (old) queueWrite({ ...f.op, item: old, expectedVersion: old.version, at: new Date().toISOString() });
+              setFailed(rows => rows.filter(x => x !== f));
+            }}>{f.op.action === "save_item" ? "입력 내용 복구" : "다시 시도"}</button>
+          </div>
+        ))}
         <main className="main-content">
           {screen === "trips" ? (
             <>

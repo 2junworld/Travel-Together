@@ -19,11 +19,12 @@ export function supabase() {
 export async function api(
   action: string,
   payload: Record<string, unknown> = {},
+  expectedUserId?: string,
 ) {
   const {
     data: { session },
   } = await supabase().auth.getSession();
-  if (!session) throw Error("로그인이 필요합니다.");
+  if (!session || (expectedUserId && session.user.id !== expectedUserId)) throw Error("로그인이 필요합니다.");
   const response = await fetch("/api/travel", {
     method: "POST",
     headers: {

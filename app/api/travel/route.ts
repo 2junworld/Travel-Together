@@ -49,15 +49,7 @@ export async function POST(request: Request) {
       global: { headers: { Authorization: authorization } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const {
-      data: { user },
-      error: authError,
-    } = await db.auth.getUser();
-    if (authError || !user)
-      return Response.json(
-        { error: "다시 로그인해 주세요." },
-        { status: 401, headers },
-      );
+    // PostgREST validates the bearer JWT; travel_command checks auth.uid() and membership.
     const { data, error } = await db.rpc("travel_command", {
       action: body.action,
       payload: body.payload || {},
@@ -66,6 +58,8 @@ export async function POST(request: Request) {
       const status =
         (
           {
+            PGRST301: 401,
+            PGRST303: 401,
             PT401: 401,
             PT403: 403,
             PT404: 404,
@@ -77,6 +71,13 @@ export async function POST(request: Request) {
         { error: status === 404 ? "항목을 찾을 수 없습니다." : error.message },
         { status, headers },
       );
+    }
+    if (["save_item", "check_item", "delete_item", "restore_item"].includes(body.action)) {
+      const { data: row } = await db.from("travel_items")
+        .select("id,trip_id,kind,title,scope,family_id,owner_id,version,created_at,deleted_at,data")
+        .eq("trip_id", body.payload.tripId)
+        .eq("id", body.payload.itemId ?? body.payload.item.id).maybeSingle();
+      return Response.json({ data: { ...data, row } }, { headers });
     }
     return Response.json({ data }, { headers });
   } catch {
