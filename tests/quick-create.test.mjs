@@ -88,7 +88,7 @@ for (const kind of ["itinerary", "places", "checklist", "tasks"])
     const mainInputs = [...host.querySelectorAll("input,textarea")].filter(
       (x) => !x.closest("details"),
     );
-    assert.equal(mainInputs.length, kind === "itinerary" ? 2 : 1);
+    assert.equal(mainInputs.length, ["itinerary", "checklist"].includes(kind) ? 2 : 1);
     assert.equal(
       host.querySelector("button[type=submit]").closest("details"),
       null,
@@ -97,6 +97,7 @@ for (const kind of ["itinerary", "places", "checklist", "tasks"])
       host.querySelector(".quick-create-scope option:checked").textContent,
       "우리 가족에게 공개",
     );
+    if (kind === "checklist") await fill(host.querySelector("input[list]"), " 백팩 ");
     await fill(input, kind === "itinerary" ? "호텔 체크인" : `${kind} 테스트`);
     await save(host);
     assert.equal(saved.length, 1);
@@ -108,7 +109,10 @@ for (const kind of ["itinerary", "places", "checklist", "tasks"])
       assert.equal(saved[0].data.date, "2026-11-29");
       assert.equal(saved[0].data.start, undefined);
     }
-    if (kind === "checklist") assert.equal(saved[0].data.quantity, 1);
+    if (kind === "checklist") {
+      assert.equal(saved[0].data.quantity, 1);
+      assert.equal(saved[0].data.bag, "백팩");
+    }
     if (kind === "tasks") assert.equal(saved[0].data.status, "예정");
     // Native details retains mounted controls and React state across open/close cycles.
     details.open = true;

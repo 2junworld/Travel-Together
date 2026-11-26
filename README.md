@@ -29,7 +29,7 @@ npm run dev:next
 
 ## 실제 공동 사용 연결
 
-1. 새 Supabase 프로젝트에서 `supabase/migrations/001_travel.sql`과 `002_production_validation.sql`을 순서대로 DB 소유자로 실행합니다. 기존 프로젝트에는 무작정 적용하지 말고 충돌을 확인해 주세요.
+1. 새 Supabase 프로젝트에서 `supabase/migrations/001_travel.sql`부터 `003_packing_bag.sql`까지의 파일을 순서대로 DB 소유자로 실행합니다. 기존 프로젝트에는 무작정 적용하지 말고 충돌을 확인해 주세요.
 2. `.env.local` / Vercel 환경변수에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 설정합니다. 공개 publishable key도 해당 변수에 사용할 수 있습니다. **service_role 키는 사용하지 않습니다.** `NEXT_PUBLIC_DEMO_MODE=false`로 둡니다.
 3. Supabase Auth의 사이트 URL을 운영 도메인으로, 리다이렉트 허용 URL에 `https://<운영 도메인>/invite/**`를 등록합니다. 이메일 로그인 링크를 이용합니다. 운영 이메일 발송 설정은 프로젝트에서 확인해 주세요.
 4. Vercel에 Next.js 프로젝트로 배포합니다. Build Command는 `npm run build:production`, Output Directory는 Next.js 기본값입니다. 체험판의 `.openai/hosting.json`은 Sites용이며 Vercel 배포 설정이 아닙니다.

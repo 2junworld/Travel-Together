@@ -192,6 +192,7 @@ export default function TravelApp() {
     [screen, setScreen] = useState("travel"),
     [search, setSearch] = useState(""),
     [status, setStatus] = useState("all"),
+    [packingGroup, setPackingGroup] = useState("bag"),
     [sort, setSort] = useState("deadline"),
     [assignee, setAssignee] = useState("all"),
     [trash, setTrash] = useState(false),
@@ -1912,6 +1913,13 @@ export default function TravelApp() {
                                 : `${tasks.filter((x) => x.data.status === "완료").length} / ${tasks.length}개 완료`}
                           </span>
                           <div className="filter-actions">
+                            {view === "checklist" && (
+                              <select aria-label="준비물 묶어 보기" value={packingGroup}
+                                onChange={(e) => setPackingGroup(e.target.value)}>
+                                <option value="bag">가방별 보기</option>
+                                <option value="category">카테고리별 보기</option>
+                              </select>
+                            )}
                             {view === "tasks" && (
                               <>
                                 <select
@@ -1998,11 +2006,11 @@ export default function TravelApp() {
                             .reduce((acc: Record<string, Item[]>, x) => {
                               const key =
                                 view === "checklist"
-                                  ? x.data.category || "기본"
+                                  ? (packingGroup === "bag" ? x.data.bag || "" : x.data.category || "기본")
                                   : "할 일 목록";
                               (acc[key] ??= []).push(x);
                               return acc;
-                            }, {}),
+                            }, Object.create(null) as Record<string, Item[]>),
                         ).map(([category, items]) => (
                           <section
                             className={
@@ -2018,7 +2026,7 @@ export default function TravelApp() {
                                 ) : (
                                   <ListTodo size={18} />
                                 )}{" "}
-                                {category}
+                                {category || "가방 미지정"}
                               </h2>
                               <span className="count-pill">{items.length}</span>
                             </div>
@@ -2055,6 +2063,9 @@ export default function TravelApp() {
                                     )}
                                   </strong>
                                   <div className="row-meta">
+                                    {view === "checklist" && packingGroup === "category" && (
+                                      <span>{x.data.bag || "가방 미지정"}</span>
+                                    )}
                                     <ScopeBadge item={x} />
                                     {(view !== "checklist" ||
                                       x.data.deadline) && (
@@ -3038,7 +3049,9 @@ export function ItemForm({
                       ),
                     ),
                   }
-                : draft,
+                : draft.kind === "checklist" && draft.data.bag
+                  ? { ...draft, data: { ...draft.data, bag: draft.data.bag.trim() } }
+                  : draft,
             );
           } catch (e: any) {
             setErr(e.message);
@@ -3094,6 +3107,19 @@ export function ItemForm({
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
             />
           </label>
+          {draft.kind === "checklist" && (
+            <label>
+              가방 라벨
+              <input list="packing-bag-options" placeholder="예: 백팩, 캐리어"
+                maxLength={60} value={draft.data.bag || ""}
+                onChange={(e) => data("bag", e.target.value)} />
+              <datalist id="packing-bag-options">
+                {[...new Set(["백팩", "캐리어", ...bundle.items
+                  .filter(x => x.kind === "checklist" && !x.deleted_at && canRead(x, me))
+                  .map(x => x.data.bag).filter(Boolean)])].map(name => <option key={name} value={name} />)}
+              </datalist>
+            </label>
+          )}
           {quickCreate && draft.kind === "itinerary" && (
             <>
               <label className="quick-create-date">

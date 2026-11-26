@@ -15,6 +15,7 @@ test("database enforces isolation, roles, versions, invitations and atomic appro
   await db.exec(
     await readFile("supabase/migrations/002_production_validation.sql", "utf8"),
   );
+  await db.exec(await readFile("supabase/migrations/003_packing_bag.sql", "utf8"));
   const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -272,6 +273,7 @@ test("database enforces isolation, roles, versions, invitations and atomic appro
   const context = await call("get_data", { tripId: otherTrip });
   for (const kind of ["itinerary", "places", "checklist", "tasks"] as const) {
     const draft = createDraft(kind, context, "family", "2026-11-29");
+    if (kind === "checklist") draft.data.bag = "  캐리어  ";
     draft.title = kind === "itinerary" ? "호텔 체크인" : kind;
     await call("save_item", {
       tripId: otherTrip,
@@ -287,7 +289,13 @@ test("database enforces isolation, roles, versions, invitations and atomic appro
       assert.equal(stored.data.date, "2026-11-29");
       assert.equal(stored.data.start, undefined);
     }
-    if (kind === "checklist") assert.equal(stored.data.quantity, 1);
+    if (kind === "checklist") {
+      assert.equal(stored.data.quantity, 1);
+      assert.equal(stored.data.bag, "캐리어");
+      await call("save_item", { tripId: otherTrip, item: {...stored, data: {...stored.data, bag: ""}}, expectedVersion: stored.version });
+      const cleared = (await call("get_data", {tripId: otherTrip})).items.find((x: any) => x.id === stored.id);
+      assert.equal(cleared.data.bag, undefined);
+    }
     if (kind === "tasks") {
       assert.equal(stored.data.status, "예정");
       assert.equal(stored.data.deadline, undefined);
